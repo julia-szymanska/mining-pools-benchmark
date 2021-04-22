@@ -75,7 +75,7 @@ struct NanopoolBalance {
     data: f64,
 }
 
-fn flexpool(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
+fn flexpool(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!("https://flexpool.io/api/v1/miner/{}/balance/", wallet);
 
     let jresponse: FlexpoolBalance = ureq::get(&url)
@@ -83,10 +83,10 @@ fn flexpool(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
         .call()?
         .into_json()?;
 
-    Ok(((jresponse.result as f64) / 1000000000000000000.0) * (100.0 as f64) / hashrate)
+    Ok((jresponse.result as f64) / 1000000000000000000.0)
 }
 
-fn ethermine(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
+fn ethermine(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!("https://api.ethermine.org/miner/{}/currentStats", wallet);
 
     let jresponse: EthermineBalance = ureq::get(&url)
@@ -94,10 +94,10 @@ fn ethermine(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
         .call()?
         .into_json()?;
 
-    Ok(((jresponse.data.unpaid as f64) / 1000000000000000000.0) * (100.0 as f64) / hashrate)
+    Ok((jresponse.data.unpaid as f64) / 1000000000000000000.0)
 }
 
-fn eth2miners(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
+fn eth2miners(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!("https://eth.2miners.com/api/accounts/{}", wallet);
 
     let jresponse: Eth2MinersBalance = ureq::get(&url)
@@ -105,10 +105,10 @@ fn eth2miners(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
         .call()?
         .into_json()?;
 
-    Ok(((jresponse.stats.balance as f64) / 1000000000.0) * (100.0 as f64) / hashrate)
+    Ok((jresponse.stats.balance as f64) / 1000000000.0)
 }
 
-fn f2pool(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
+fn f2pool(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!("https://api.f2pool.com/eth/{}", wallet);
 
     let jresponse: F2PoolBalance = ureq::get(&url)
@@ -116,10 +116,10 @@ fn f2pool(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
         .call()?
         .into_json()?;
 
-    Ok((jresponse.balance) * (100.0 as f64) / hashrate)
+    Ok(jresponse.balance)
 }
 
-fn hiveon(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
+fn hiveon(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!(
         "https://hiveon.net/api/v1/stats/miner/{}/ETH/billing-acc",
         wallet
@@ -134,10 +134,10 @@ fn hiveon(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
         .call()?
         .into_json()?;
 
-    Ok((jresponse.totalUnpaid) * (100.0 as f64) / hashrate)
+    Ok(jresponse.totalUnpaid)
 }
 
-fn nanopool(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
+fn nanopool(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!("https://api.nanopool.org/v1/eth/balance/{}", wallet);
 
     let jresponse: NanopoolBalance = ureq::get(&url)
@@ -145,7 +145,7 @@ fn nanopool(wallet: &str, hashrate: f64) -> Result<f64, ureq::Error> {
         .call()?
         .into_json()?;
 
-    Ok((jresponse.data) * (100.0 as f64) / hashrate)
+    Ok(jresponse.data)
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -153,6 +153,7 @@ struct PoolConfig {
     check: bool,
     wallet: String,
     hashrate: f64,
+    starting_balance: f64,
 }
 #[derive(Deserialize, Serialize, Debug, Default)]
 struct Pools {
@@ -194,6 +195,36 @@ fn read(var: &mut String, pool: &str, cfg: &mut PoolConfig) {
     let mut hashrate = String::new();
     std::io::stdin().read_line(&mut hashrate).expect("Failed");
     cfg.hashrate = hashrate.trim().to_string().parse::<f64>().unwrap_or(1.0);
+
+    // starting balance
+    print!("Subtract the current balance? [Y/n]: ");
+    io::stdout().flush().unwrap();
+    std::io::stdin().read_line(var).expect("Failed");
+    if var.to_lowercase().contains("y") {
+        cfg.starting_balance = match pool {
+            "Flexpool" => flexpool(&cfg.wallet).unwrap_or(0.0),
+            "Ethermine" => ethermine(&cfg.wallet).unwrap_or(0.0),
+            "2miners" => eth2miners(&cfg.wallet).unwrap_or(0.0),
+            "F2Pool" => f2pool(&cfg.wallet).unwrap_or(0.0),
+            "Hiveon" => hiveon(&cfg.wallet).unwrap_or(0.0),
+            "Nanopool" => nanopool(&cfg.wallet).unwrap_or(0.0),
+            _ => { println!("Error!"); 0.0 as f64 },
+        }
+    };
+}
+
+fn get_pool_config(name: &str) -> PoolConfig {
+    let config: Config = serde_yaml::from_reader(std::fs::File::open("config.yml").unwrap()).unwrap(); // TODO: remove this
+
+    match name {
+        "Flexpool" => config.pools.flexpool,
+        "Ethermine" => config.pools.ethermine,
+        "2miners" => config.pools.eth2miners,
+        "F2Pool" => config.pools.f2pool,
+        "Hiveon" => config.pools.hiveon,
+        "Nanopool" => config.pools.nanopool,
+        _ => { println!("Error!"); return config.pools.ethermine },
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -230,44 +261,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if config.pools.flexpool.check {
         pools.push(Pool {
             name: "Flexpool".to_string(),
-            balance: flexpool(&config.pools.flexpool.wallet, config.pools.flexpool.hashrate).unwrap_or(0.0),
+            balance: flexpool(&config.pools.flexpool.wallet).unwrap_or(0.0),
         });
     }
     if config.pools.ethermine.check {
         pools.push(Pool {
             name: "Ethermine".to_string(),
-            balance: ethermine(&config.pools.ethermine.wallet, config.pools.ethermine.hashrate).unwrap_or(0.0),
+            balance: ethermine(&config.pools.ethermine.wallet).unwrap_or(0.0),
         });
     }
     if config.pools.eth2miners.check {
         pools.push(Pool {
             name: "2miners".to_string(),
-            balance: eth2miners(&config.pools.eth2miners.wallet, config.pools.eth2miners.hashrate).unwrap_or(0.0),
+            balance: eth2miners(&config.pools.eth2miners.wallet).unwrap_or(0.0),
         });
     }
     if config.pools.f2pool.check {
         pools.push(Pool {
             name: "F2Pool".to_string(),
-            balance: f2pool(&config.pools.f2pool.wallet, config.pools.f2pool.hashrate).unwrap_or(0.0),
+            balance: f2pool(&config.pools.f2pool.wallet).unwrap_or(0.0),
         });
     }
     if config.pools.hiveon.check {
         pools.push(Pool {
             name: "Hiveon".to_string(),
-            balance: hiveon(&config.pools.hiveon.wallet, config.pools.hiveon.hashrate).unwrap_or(0.0),
+            balance: hiveon(&config.pools.hiveon.wallet).unwrap_or(0.0),
         });
     }
     if config.pools.nanopool.check {
         pools.push(Pool {
             name: "Nanopool".to_string(),
-            balance: nanopool(&config.pools.nanopool.wallet, config.pools.nanopool.hashrate).unwrap_or(0.0),
+            balance: nanopool(&config.pools.nanopool.wallet).unwrap_or(0.0),
         });
     }
 
     pools.sort_by(|a, b| (b.balance).partial_cmp(&a.balance).unwrap());
 
     for pool in pools.iter() {
-        print!("{}: {} ETH", pool.name, pool.balance);
+        let pool_config = get_pool_config(&pool.name);
+        print!("{}: {} ETH", pool.name, (pool.balance - pool_config.starting_balance) * (100.0 as f64) / pool_config.hashrate);
         if pool.name == pools[0].name {
             println!();
         } else {
