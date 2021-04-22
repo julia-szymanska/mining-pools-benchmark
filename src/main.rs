@@ -171,15 +171,16 @@ struct Config {
     pools: Pools,
 }
 
-fn read(var: &mut String, pool: &str, cfg: &mut PoolConfig) {
+fn read(pool: &str, cfg: &mut PoolConfig) {
     use std::io;
     use std::io::Write;
     
     // check if active
+    let mut check_line: String = String::new();
     print!("{}? [Y/n]: ", pool);
     io::stdout().flush().unwrap();
-    std::io::stdin().read_line(var).expect("Failed");
-    if var.to_lowercase().contains("y") {
+    std::io::stdin().read_line(&mut check_line).expect("Failed");
+    if check_line.to_lowercase().contains("y") {
         cfg.check = true;
     } else {
         return;
@@ -199,8 +200,9 @@ fn read(var: &mut String, pool: &str, cfg: &mut PoolConfig) {
     // starting balance
     print!("Subtract the current balance? [Y/n]: ");
     io::stdout().flush().unwrap();
-    std::io::stdin().read_line(var).expect("Failed");
-    if var.to_lowercase().contains("y") {
+    let mut line: String = String::new();
+    std::io::stdin().read_line(&mut line).expect("Failed");
+    if line.to_lowercase().contains("y") {
         cfg.starting_balance = match pool {
             "Flexpool" => flexpool(&cfg.wallet).unwrap_or(0.0),
             "Ethermine" => ethermine(&cfg.wallet).unwrap_or(0.0),
@@ -233,18 +235,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         config = serde_yaml::from_reader(std::fs::File::open("config.yml")?)?;
     } else {
         config = Config::default();
-        let mut flexpool = String::new();
-        read(&mut flexpool, "Flexpool", &mut config.pools.flexpool);
-        let mut ethermine = String::new();
-        read(&mut ethermine, "Ethermine", &mut config.pools.ethermine);
-        let mut eth2miners = String::new();
-        read(&mut eth2miners, "2miners", &mut config.pools.eth2miners);
-        let mut f2pool = String::new();
-        read(&mut f2pool, "F2Pool", &mut config.pools.f2pool);
-        let mut hiveon = String::new();
-        read(&mut hiveon, "Hiveon", &mut config.pools.hiveon);
-        let mut nanopool = String::new();
-        read(&mut nanopool, "Nanopool", &mut config.pools.nanopool);
+        read("Flexpool", &mut config.pools.flexpool);
+        read("Ethermine", &mut config.pools.ethermine);
+        read("2miners", &mut config.pools.eth2miners);
+        read("F2Pool", &mut config.pools.f2pool);
+        read("Hiveon", &mut config.pools.hiveon);
+        read("Nanopool", &mut config.pools.nanopool);
 
         use std::fs;
         fs::write("config.yml", serde_yaml::to_string(&config)?).expect("Unable to write file");
