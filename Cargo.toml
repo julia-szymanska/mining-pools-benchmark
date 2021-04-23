@@ -1,6 +1,6 @@
 [package]
 name = "mining-pools-benchmark"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Julia Szymańska <juliaszymanska@yandex.com>"]
 edition = "2018"
 
