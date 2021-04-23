@@ -160,7 +160,10 @@ fn nanopool(wallet: &str) -> Result<f64, ureq::Error> {
 }
 
 fn sparkpool(wallet: &str) -> Result<f64, ureq::Error> {
-    let url: String = format!("https://www.sparkpool.com/v1/bill/stats?miner={}&currency=ETH", wallet);
+    let url: String = format!(
+        "https://www.sparkpool.com/v1/bill/stats?miner={}&currency=ETH",
+        wallet
+    );
 
     let jresponse: SparkPoolBalance = ureq::get(&url)
         .set("accept", "application/json")
@@ -261,8 +264,18 @@ fn get_pool_config(name: &str) -> PoolConfig {
     }
 }
 
-fn get_balance(original_balance: f64, hashrate: f64) -> f64 {
-    original_balance * (100.0 as f64) / hashrate
+#[derive(Debug)]
+struct Pool {
+    name: String,
+    balance: f64,
+}
+
+fn get_pool_data(pool_name: &str, original_balance: f64, hashrate: f64) -> Pool {
+    Pool {
+        name: pool_name.to_string(),
+        balance: original_balance * (100.0 as f64) / hashrate
+            - get_pool_config(pool_name).starting_balance,
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -283,87 +296,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         fs::write("config.yml", serde_yaml::to_string(&config)?).expect("Unable to write file");
     }
 
-    #[derive(Debug)]
-    struct Pool {
-        name: String,
-        balance: f64,
-    }
-
     let mut pools: Vec<Pool> = vec![];
 
     if config.pools.flexpool.check {
-        pools.push(Pool {
-            name: "Flexpool".to_string(),
-            balance: get_balance(
-                flexpool(&config.pools.flexpool.wallet).unwrap_or(0.0),
-                config.pools.flexpool.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "Flexpool",
+            flexpool(&config.pools.flexpool.wallet).unwrap_or(0.0),
+            config.pools.flexpool.hashrate,
+        ));
     }
     if config.pools.ethermine.check {
-        pools.push(Pool {
-            name: "Ethermine".to_string(),
-            balance: get_balance(
-                ethermine(&config.pools.ethermine.wallet).unwrap_or(0.0),
-                config.pools.ethermine.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "Ethermine",
+            ethermine(&config.pools.ethermine.wallet).unwrap_or(0.0),
+            config.pools.ethermine.hashrate,
+        ));
     }
     if config.pools.eth2miners.check {
-        pools.push(Pool {
-            name: "2miners".to_string(),
-            balance: get_balance(
-                eth2miners(&config.pools.eth2miners.wallet).unwrap_or(0.0),
-                config.pools.eth2miners.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "2miners",
+            eth2miners(&config.pools.eth2miners.wallet).unwrap_or(0.0),
+            config.pools.eth2miners.hashrate,
+        ));
     }
     if config.pools.f2pool.check {
-        pools.push(Pool {
-            name: "F2Pool".to_string(),
-            balance: get_balance(
-                f2pool(&config.pools.f2pool.wallet).unwrap_or(0.0),
-                config.pools.f2pool.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "F2Pool",
+            f2pool(&config.pools.f2pool.wallet).unwrap_or(0.0),
+            config.pools.f2pool.hashrate,
+        ));
     }
     if config.pools.hiveon.check {
-        pools.push(Pool {
-            name: "Hiveon".to_string(),
-            balance: get_balance(
-                hiveon(&config.pools.hiveon.wallet).unwrap_or(0.0),
-                config.pools.hiveon.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "Hiveon",
+            hiveon(&config.pools.hiveon.wallet).unwrap_or(0.0),
+            config.pools.hiveon.hashrate,
+        ));
     }
     if config.pools.nanopool.check {
-        pools.push(Pool {
-            name: "Nanopool".to_string(),
-            balance: get_balance(
-                nanopool(&config.pools.nanopool.wallet).unwrap_or(0.0),
-                config.pools.nanopool.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "Nanopool",
+            nanopool(&config.pools.nanopool.wallet).unwrap_or(0.0),
+            config.pools.nanopool.hashrate,
+        ));
     }
     if config.pools.sparkpool.check {
-        pools.push(Pool {
-            name: "SparkPool".to_string(),
-            balance: get_balance(
-                sparkpool(&config.pools.sparkpool.wallet).unwrap_or(0.0),
-                config.pools.sparkpool.hashrate,
-            ),
-        });
+        pools.push(get_pool_data(
+            "SparkPool",
+            sparkpool(&config.pools.sparkpool.wallet).unwrap_or(0.0),
+            config.pools.sparkpool.hashrate,
+        ));
     }
 
     pools.sort_by(|a, b| (b.balance).partial_cmp(&a.balance).unwrap());
 
     for pool in pools.iter() {
-        let pool_config = get_pool_config(&pool.name);
-        print!(
-            "{}: {} ETH",
-            pool.name,
-            (pool.balance - pool_config.starting_balance)
-        );
+        print!("{}: {} ETH", pool.name, pool.balance);
         if pool.name == pools[0].name {
             println!();
         } else {
