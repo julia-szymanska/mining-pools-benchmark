@@ -236,6 +236,10 @@ fn get_pool_config(name: &str) -> PoolConfig {
     }
 }
 
+fn get_balance(original_balance: f64, hashrate: f64) -> f64 {
+    original_balance * (100.0 as f64) / hashrate
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config: Config;
     if std::path::Path::new("config.yml").exists() {
@@ -264,37 +268,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if config.pools.flexpool.check {
         pools.push(Pool {
             name: "Flexpool".to_string(),
-            balance: flexpool(&config.pools.flexpool.wallet).unwrap_or(0.0),
+            balance: get_balance(
+                flexpool(&config.pools.flexpool.wallet).unwrap_or(0.0),
+                config.pools.flexpool.hashrate,
+            ),
         });
     }
     if config.pools.ethermine.check {
         pools.push(Pool {
             name: "Ethermine".to_string(),
-            balance: ethermine(&config.pools.ethermine.wallet).unwrap_or(0.0),
+            balance: get_balance(
+                ethermine(&config.pools.ethermine.wallet).unwrap_or(0.0),
+                config.pools.ethermine.hashrate,
+            ),
         });
     }
     if config.pools.eth2miners.check {
         pools.push(Pool {
             name: "2miners".to_string(),
-            balance: eth2miners(&config.pools.eth2miners.wallet).unwrap_or(0.0),
+            balance: get_balance(
+                eth2miners(&config.pools.eth2miners.wallet).unwrap_or(0.0),
+                config.pools.eth2miners.hashrate,
+            ),
         });
     }
     if config.pools.f2pool.check {
         pools.push(Pool {
             name: "F2Pool".to_string(),
-            balance: f2pool(&config.pools.f2pool.wallet).unwrap_or(0.0),
+            balance: get_balance(
+                f2pool(&config.pools.f2pool.wallet).unwrap_or(0.0),
+                config.pools.f2pool.hashrate,
+            ),
         });
     }
     if config.pools.hiveon.check {
         pools.push(Pool {
             name: "Hiveon".to_string(),
-            balance: hiveon(&config.pools.hiveon.wallet).unwrap_or(0.0),
+            balance: get_balance(
+                hiveon(&config.pools.hiveon.wallet).unwrap_or(0.0),
+                config.pools.hiveon.hashrate,
+            ),
         });
     }
     if config.pools.nanopool.check {
         pools.push(Pool {
             name: "Nanopool".to_string(),
-            balance: nanopool(&config.pools.nanopool.wallet).unwrap_or(0.0),
+            balance: get_balance(
+                nanopool(&config.pools.nanopool.wallet).unwrap_or(0.0),
+                config.pools.nanopool.hashrate,
+            ),
         });
     }
 
@@ -305,7 +327,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print!(
             "{}: {} ETH",
             pool.name,
-            (pool.balance - pool_config.starting_balance) * (100.0 as f64) / pool_config.hashrate
+            (pool.balance - pool_config.starting_balance)
         );
         if pool.name == pools[0].name {
             println!();
