@@ -75,6 +75,17 @@ struct NanopoolBalance {
     data: f64,
 }
 
+#[derive(Deserialize, Debug)]
+struct SparkPoolData {
+    balance: f64,
+}
+
+#[derive(Deserialize, Debug)]
+struct SparkPoolBalance {
+    code: serde_json::Value,
+    data: SparkPoolData,
+}
+
 fn flexpool(wallet: &str) -> Result<f64, ureq::Error> {
     let url: String = format!("https://flexpool.io/api/v1/miner/{}/balance/", wallet);
 
@@ -148,6 +159,17 @@ fn nanopool(wallet: &str) -> Result<f64, ureq::Error> {
     Ok(jresponse.data)
 }
 
+fn sparkpool(wallet: &str) -> Result<f64, ureq::Error> {
+    let url: String = format!("https://www.sparkpool.com/v1/bill/stats?miner={}&currency=ETH", wallet);
+
+    let jresponse: SparkPoolBalance = ureq::get(&url)
+        .set("accept", "application/json")
+        .call()?
+        .into_json()?;
+
+    Ok(jresponse.data.balance)
+}
+
 #[derive(Deserialize, Serialize, Debug, Default)]
 struct PoolConfig {
     check: bool,
@@ -164,6 +186,7 @@ struct Pools {
     f2pool: PoolConfig,
     hiveon: PoolConfig,
     nanopool: PoolConfig,
+    sparkpool: PoolConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -210,6 +233,7 @@ fn read(pool: &str, cfg: &mut PoolConfig) {
             "F2Pool" => f2pool(&cfg.wallet).unwrap_or(0.0),
             "Hiveon" => hiveon(&cfg.wallet).unwrap_or(0.0),
             "Nanopool" => nanopool(&cfg.wallet).unwrap_or(0.0),
+            "SparkPool" => sparkpool(&cfg.wallet).unwrap_or(0.0),
             _ => {
                 println!("Error!");
                 0.0 as f64
@@ -229,6 +253,7 @@ fn get_pool_config(name: &str) -> PoolConfig {
         "F2Pool" => config.pools.f2pool,
         "Hiveon" => config.pools.hiveon,
         "Nanopool" => config.pools.nanopool,
+        "SparkPool" => config.pools.sparkpool,
         _ => {
             println!("Error!");
             return config.pools.ethermine;
@@ -252,6 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         read("F2Pool", &mut config.pools.f2pool);
         read("Hiveon", &mut config.pools.hiveon);
         read("Nanopool", &mut config.pools.nanopool);
+        read("SparkPool", &mut config.pools.sparkpool);
 
         use std::fs;
         fs::write("config.yml", serde_yaml::to_string(&config)?).expect("Unable to write file");
@@ -316,6 +342,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             balance: get_balance(
                 nanopool(&config.pools.nanopool.wallet).unwrap_or(0.0),
                 config.pools.nanopool.hashrate,
+            ),
+        });
+    }
+    if config.pools.sparkpool.check {
+        pools.push(Pool {
+            name: "SparkPool".to_string(),
+            balance: get_balance(
+                sparkpool(&config.pools.sparkpool.wallet).unwrap_or(0.0),
+                config.pools.sparkpool.hashrate,
             ),
         });
     }
