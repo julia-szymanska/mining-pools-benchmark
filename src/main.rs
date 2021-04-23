@@ -174,7 +174,7 @@ struct Config {
 fn read(pool: &str, cfg: &mut PoolConfig) {
     use std::io;
     use std::io::Write;
-    
+
     // check if active
     let mut check_line: String = String::new();
     print!("{}? [Y/n]: ", pool);
@@ -210,13 +210,17 @@ fn read(pool: &str, cfg: &mut PoolConfig) {
             "F2Pool" => f2pool(&cfg.wallet).unwrap_or(0.0),
             "Hiveon" => hiveon(&cfg.wallet).unwrap_or(0.0),
             "Nanopool" => nanopool(&cfg.wallet).unwrap_or(0.0),
-            _ => { println!("Error!"); 0.0 as f64 },
+            _ => {
+                println!("Error!");
+                0.0 as f64
+            }
         }
     };
 }
 
 fn get_pool_config(name: &str) -> PoolConfig {
-    let config: Config = serde_yaml::from_reader(std::fs::File::open("config.yml").unwrap()).unwrap(); // TODO: remove this
+    let config: Config =
+        serde_yaml::from_reader(std::fs::File::open("config.yml").unwrap()).unwrap(); // TODO: remove this
 
     match name {
         "Flexpool" => config.pools.flexpool,
@@ -225,7 +229,10 @@ fn get_pool_config(name: &str) -> PoolConfig {
         "F2Pool" => config.pools.f2pool,
         "Hiveon" => config.pools.hiveon,
         "Nanopool" => config.pools.nanopool,
-        _ => { println!("Error!"); return config.pools.ethermine },
+        _ => {
+            println!("Error!");
+            return config.pools.ethermine;
+        }
     }
 }
 
@@ -295,7 +302,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for pool in pools.iter() {
         let pool_config = get_pool_config(&pool.name);
-        print!("{}: {} ETH", pool.name, (pool.balance - pool_config.starting_balance) * (100.0 as f64) / pool_config.hashrate);
+        print!(
+            "{}: {} ETH",
+            pool.name,
+            (pool.balance - pool_config.starting_balance) * (100.0 as f64) / pool_config.hashrate
+        );
         if pool.name == pools[0].name {
             println!();
         } else {
